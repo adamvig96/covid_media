@@ -1,0 +1,27 @@
+
+\begin{table}
+\caption{Regression on 	extbf{tag mention in a month (0-1)} with country and month fixed effects}
+\begin{center}
+\begin{tabular}{l c c c}
+\hline
+ & All countries & EU & Non-EU \\
+\hline
+Monthly new deaths       & $0.26^{*}$       & $0.03$           & $0.13$           \\
+                         & $ [ 0.04; 0.48]$ & $ [-0.28; 0.34]$ & $ [-0.26; 0.51]$ \\
+NER                      & $0.00$           & $0.04$           & $-0.00$          \\
+                         & $ [-0.01; 0.02]$ & $ [-0.01; 0.08]$ & $ [-0.01; 0.01]$ \\
+Monthly new deaths * NER & $0.08$           & $-0.12$          & $0.20$           \\
+                         & $ [-0.12; 0.27]$ & $ [-0.26; 0.02]$ & $ [-0.17; 0.57]$ \\
+\hline
+R$^2$                    & $0.50$           & $0.46$           & $0.39$           \\
+Adj. R$^2$               & $0.49$           & $0.44$           & $0.38$           \\
+Num. obs.                & $10860$          & $1560$           & $9300$           \\
+RMSE                     & $0.30$           & $0.36$           & $0.28$           \\
+N Clusters               & $181$            & $26$             & $155$            \\
+\hline
+\multicolumn{4}{l}{\scriptsize{EU without Great Britain
+ Standard errors clustered on countries}}
+\end{tabular}
+\label{table:coefficients}
+\end{center}
+\end{table}
