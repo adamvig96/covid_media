@@ -3,3 +3,8 @@ data
 .Rproj.user
 analysis_covid.Rproj
 .ipynb_checkpoints
+experiment
+covid_countries.pdf
+code/old
+code/stata.do
+figures

@@ -32,13 +32,18 @@ text_data$tags = tolower(text_data$tags)
 # define covid tags
 covid_tags <- c("koronavírus","covid-2019","sars-cov","covid-19","covid")
 
+# define death tags
+death_tags <- c("halál","elhuny","meghal")
+
 # select articles based in covid tag apperance in text or tags
 
 text_data$covid_in_tags <-as.numeric(grepl( paste(covid_tags, collapse="|"), text_data$tags))
 text_data$covid_in_text <-as.numeric(grepl( paste(covid_tags, collapse="|"), text_data$text))
 
+text_data$death_in_text <-as.numeric(grepl( paste(death_tags, collapse="|"), text_data$text, perl = TRUE))
 
-table(text_data %>% select(covid_in_tags,covid_in_text))
+
+table(text_data %>% select(covid_in_tags,covid_in_text,death_in_text))
 
 
 # Filter out covid stories
@@ -88,8 +93,9 @@ text_cat_filt <- text_data %>% filter(category %in% filter_categories$category)
 #select covid related articles
 
 covid_in <- text_cat_filt%>% 
-  filter(covid_in_tags==1 & covid_in_text ==1) %>% select(date,page,text,tags,category)
+  filter(covid_in_tags==1 & covid_in_text ==1) %>% select(date,page,text,tags,category,death_in_text)
+
+
 
 #Save file
 write.csv(covid_in,paste(data_dir,"analysis_covid/data/covid_text.csv",sep="/"))
-

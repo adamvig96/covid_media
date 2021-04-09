@@ -23,6 +23,7 @@ require(forcats)
 data_dir = "/Users/vigadam/Dropbox/My Mac (MacBook-Air.local)/Documents/github/media_network/media_data/analysis_covid/data"
 
 covid_text <- read_csv(paste(data_dir,"covid_text.csv",sep="/")) %>% select(-1)
+covid_text <- covid_text %>% filter(death_in_text == 1)
 
 countries <-  read_csv(paste(data_dir,"country_names_en_hun.csv",sep="/")) %>% select(-1)
 
@@ -48,7 +49,7 @@ covid_text <- covid_text %>%
   mutate(category = gsub("ketharmad", "belfold", category)) %>% # 888
   mutate(category = gsub("amerika-london-parizs", "kulfold", category))  # 888
 
-covid_text %>% count(category) %>% arrange(desc(n))
+covid_text %>% dplyr::count(category) %>% arrange(desc(n))
 
 # further refining needed after filtering for foreign countries
 
@@ -97,12 +98,12 @@ country_tags <- foreign_countries$country_hun
 covid_text$foreign_dummy <- as.numeric(grepl( paste(country_tags, collapse="|"), covid_text$text))
 
 
-covid_text %>% filter(foreign_dummy == 1) %>% count(category) %>% arrange(desc(n))
+covid_text %>% filter(foreign_dummy == 1) %>% dplyr::count(category) %>% arrange(desc(n))
 
 
 
 covid_text %>% filter(foreign_dummy == 1) %>%
-  count(category) %>% mutate(category = fct_reorder(category, n, .desc = TRUE)) %>%
+  dplyr::count(category) %>% mutate(category = fct_reorder(category, n, .desc = TRUE)) %>%
   ggplot(aes(x = category, y = n)) + geom_bar(stat = 'identity') + ggtitle("Country related covid articles in categories")
 
 
@@ -156,13 +157,10 @@ country_by_week_m <- merge(x = country_by_week_m, y = month_week, by = "week", a
   arrange(iso3,page,week)
 
 
-write.csv(country_by_week_m,paste(data_dir,"country_mentions_in_covid_text.csv",sep="/"))
+write.csv(country_by_week_m,paste(data_dir,"country_mentions_in_covid_death_text.csv",sep="/"))
 
 
 
-## Read weekly covid data
-
-covid_by_week <- read_csv(paste(data_dir,"covid_data_week.csv",sep="/")) %>% select(-1)
 
 
 

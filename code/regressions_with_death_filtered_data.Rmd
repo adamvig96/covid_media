@@ -1,0 +1,251 @@
+---
+title: "Regression models on death related articles data"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_knit$set(root.dir = "/Users/vigadam/Dropbox/My Mac (MacBook-Air.local)/Documents/github/media_network/media_data/analysis_covid/")
+
+rm(list=ls())
+
+library(estimatr)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tidyverse)
+library(texreg)
+```
+
+
+```{r data, include=FALSE}
+data <- read_csv("data/data_for_regression_only_death_mention.csv") %>% select(-1) %>% arrange(page,iso3,week) %>% filter(page != "Index")
+
+#View(data %>% filter(country_hun =="németország") %>% filter(week == "10"))
+
+data <- data %>% mutate(NER = ifelse(page == "origo" | page == "888" | page == "mno","ner","ellenzék"),
+                        ner = ifelse(page == "origo" | page == "888" | page == "mno",1,0),
+                        weekly_new_deaths_per1k = weekly_new_deaths_permillion/1000,
+                        weekly_new_cases_per1k = weekly_new_cases_permillion/1000,
+                        death_change = ifelse((weekly_new_deaths_per1k - lag(weekly_new_deaths_per1k))>0,1,0))
+
+euiso <- c("AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC", "HUN", "IRL", "ITA", "LVA", "LTU", "LUX", "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "ESP", "SWE")
+
+eu_df <- data.frame(matrix(unlist(euiso), nrow=length(euiso), byrow=TRUE),stringsAsFactors=FALSE) %>% 
+  dplyr::rename(iso3 = matrix.unlist.euiso...nrow...length.euiso...byrow...TRUE.) %>% mutate(eu = TRUE)
+
+data <- data %>% merge(eu_df,by=("iso3"),all.x = TRUE) %>% replace_na(list(eu = FALSE))
+
+# create month frame
+data_month <- data %>% select(-c(week)) %>% group_by(iso3,page,month) %>% dplyr::summarise( 
+  country_hun = unique(country_hun),
+  ner = unique(ner),
+  eu = unique(eu),
+  monthly_new_deaths_per1k = sum(weekly_new_deaths_per1k),
+  continent = unique(continent),
+  monthly_new_cases_per1k = sum(weekly_new_cases_per1k),
+  mention_count_in_tags = sum(mention_count_in_tags),
+  mention_count_in_text = sum(mention_count_in_text)) %>% 
+  mutate(mentioned_in_tags = ifelse(mention_count_in_tags>0,1,0),
+         mentioned_in_text = ifelse(mention_count_in_text>0,1,0),
+         death_change = ifelse((monthly_new_deaths_per1k - lag(monthly_new_deaths_per1k))>0,1,0))
+
+rm(list=c("data","eu_df"))
+
+```
+
+ Fixed effect regression
+```{r mentioned_in_tags ~ monthly_new_deaths_per1k regression, echo=FALSE}
+
+#data_month %>% filter(eu == TRUE) %>% select(mentioned_in_tags) %>% table()
+
+
+lmr_out_all <- lm_robust(mentioned_in_tags ~ monthly_new_deaths_per1k + ner + ner*monthly_new_deaths_per1k, 
+                     data = data_month, se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_eu <- lm_robust(mentioned_in_tags ~ monthly_new_deaths_per1k + ner + ner*monthly_new_deaths_per1k, 
+                     data = data_month, 
+                     subset = eu == TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+lmr_out_noneu <- lm_robust(mentioned_in_tags ~ monthly_new_deaths_per1k + ner + ner*monthly_new_deaths_per1k, 
+                     data = data_month, 
+                     subset = eu != TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+
+#data %>% filter(eu != TRUE & continent == "Europe") %>% select(country_hun) %>% table()
+texreg(list(lmr_out_all,lmr_out_eu,lmr_out_noneu), 
+       custom.model.names = c("All countries","EU","Non-EU"),
+       caption ="Regression on \textbf{tag mention in a month (0-1)} with country and month fixed effects",
+       custom.note = "EU without Great Britain\n Standard errors clustered on countries",
+       custom.coef.names = c("Monthly new deaths","NER","Monthly new deaths * NER"),
+       stars = 0.05,caption.above = TRUE,ci.force = FALSE,inculde.ci=FALSE)
+
+```
+
+```{r mention_count_in_tags ~ monthly_new_deaths_per1k regression, echo=FALSE}
+
+#data_month %>% filter(eu == TRUE) %>% select(mentioned_in_tags) %>% table()
+
+
+lmr_out_all <- lm_robust(mention_count_in_text ~ monthly_new_deaths_per1k + ner + ner*monthly_new_deaths_per1k, 
+                     data = data_month, se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_eu <- lm_robust(mention_count_in_text ~ monthly_new_deaths_per1k + ner + ner*monthly_new_deaths_per1k, 
+                     data = data_month, 
+                     subset = eu == TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+lmr_out_noneu <- lm_robust(mention_count_in_text ~ monthly_new_deaths_per1k + ner + ner*monthly_new_deaths_per1k, 
+                     data = data_month, 
+                     subset = eu != TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+
+#data %>% filter(eu != TRUE & continent == "Europe") %>% select(country_hun) %>% table()
+texreg(list(lmr_out_all,lmr_out_eu,lmr_out_noneu), 
+       custom.model.names = c("All countries","EU","Non-EU"),
+       caption ="Regression on \textbf{sum of mentions} in a month with country and month fixed effects",
+       custom.note = "EU without Great Britain\n Standard errors clustered on countries",
+       custom.coef.names = c("Monthly new deaths","NER","Monthly new deaths * NER"),
+       stars = 0.05,caption.above = TRUE,ci.force = FALSE,inculde.ci=FALSE)
+
+```
+
+Regression on death growths
+
+```{r mentioned_in_tags ~ death_change regression, echo=FALSE}
+
+lmr_out_all <- lm_robust(mentioned_in_tags ~ death_change + ner + ner*death_change, 
+                     data = data_month, se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_eu <- lm_robust(mentioned_in_tags ~ death_change + ner + ner*death_change, 
+                     data = data_month, 
+                     subset = eu == TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+lmr_out_noneu <- lm_robust(mentioned_in_tags ~ death_change + ner + ner*death_change, 
+                     data = data_month, 
+                     subset = eu != TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+
+#data %>% filter(eu != TRUE & continent == "Europe") %>% select(country_hun) %>% table()
+texreg(list(lmr_out_all,lmr_out_eu,lmr_out_noneu), 
+       custom.model.names = c("All countries","EU","Non-EU"),
+       caption ="Regression on \textbf{tag mention in a month (0-1)} with country and month fixed effects",
+       custom.note = "EU without Great Britain Standard errors clustered on countries",
+              custom.coef.names = c("Monthly deaths rise*","NER","Monthly deaths rise * NER"),
+       stars = 0.05,caption.above = TRUE,ci.force = FALSE,inculde.ci=FALSE)
+
+
+```
+
+
+```{r mention_count_in_tags ~ death_change regression, echo=FALSE}
+
+lmr_out_all <- lm_robust(mention_count_in_tags ~ death_change + ner + ner*death_change, 
+                     data = data_month, se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_eu <- lm_robust(mention_count_in_tags ~ death_change + ner + ner*death_change, 
+                     data = data_month, 
+                     subset = eu == TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+lmr_out_noneu <- lm_robust(mention_count_in_tags ~ death_change + ner + ner*death_change, 
+                     data = data_month, 
+                     subset = eu != TRUE,
+                     se_type = "stata", fixed_effects = ~ month + iso3,clusters = iso3)
+
+
+#data %>% filter(eu != TRUE & continent == "Europe") %>% select(country_hun) %>% table()
+texreg(list(lmr_out_all,lmr_out_eu,lmr_out_noneu), 
+       custom.model.names = c("All countries","EU","Non-EU"),
+       caption ="Regression on \textbf{sum of mentions} in a month with country and month fixed effects",
+       custom.note = "EU without Great Britain Standard errors clustered on countries ",
+              custom.coef.names = c("Monthly deaths rise*","NER","Monthly deaths rise * NER"),
+       stars = 0.05,caption.above = TRUE,ci.force = FALSE,inculde.ci=FALSE)
+
+
+```
+
+```{r newspaper regressions on deaths, echo=FALSE}
+
+lmr_out_1 <- lm_robust(mention_count_in_tags ~ monthly_new_deaths_per1k,
+                     data = data_month %>% filter(page == "24"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_2 <- lm_robust(mention_count_in_tags ~ monthly_new_deaths_per1k,
+                     data = data_month %>% filter(page == "444"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_3 <- lm_robust(mention_count_in_tags ~ monthly_new_deaths_per1k,
+                     data = data_month %>% filter(page == "888"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_4 <- lm_robust(mention_count_in_tags ~ monthly_new_deaths_per1k,
+                     data = data_month %>% filter(page == "mno"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_5 <- lm_robust(mention_count_in_tags ~ monthly_new_deaths_per1k,
+                     data = data_month %>% filter(page == "origo"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+texreg(list(lmr_out_1,lmr_out_2,lmr_out_3,lmr_out_4,lmr_out_5), 
+       custom.model.names = c("24.hu","444.hu","888.hu","mno.hu","origo.hu"),
+       caption ="Regression on \textbf{sum of mentions} in a month with country and month fixed effects",
+       custom.note = "Standard errors clustered on countries",
+       custom.coef.names = c("Monthly new deaths"),
+       stars = 0.05,caption.above = TRUE,ci.force = FALSE,inculde.ci=FALSE)
+```
+
+
+```{r newspaper regressions on death grow dummie, echo=FALSE}
+
+lmr_out_1 <- lm_robust(mention_count_in_tags ~ death_change,
+                     data = data_month %>% filter(page == "24"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_2 <- lm_robust(mention_count_in_tags ~ death_change,
+                     data = data_month %>% filter(page == "444"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_3 <- lm_robust(mention_count_in_tags ~ death_change,
+                     data = data_month %>% filter(page == "888"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_4 <- lm_robust(mention_count_in_tags ~ death_change,
+                     data = data_month %>% filter(page == "mno"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+lmr_out_5 <- lm_robust(mention_count_in_tags ~ death_change,
+                     data = data_month %>% filter(page == "origo"), se_type = "stata", fixed_effects = ~ month + iso3,
+                     clusters = iso3)
+
+texreg(list(lmr_out_1,lmr_out_2,lmr_out_3,lmr_out_4,lmr_out_5), 
+       custom.model.names = c("24.hu","444.hu","888.hu","mno.hu","origo.hu"),
+       caption ="Regression on \textbf{sum of mentions} in a month with country and month fixed effects",
+       custom.note = "Standard errors clustered on countries",
+       custom.coef.names = c("Monthly deaths rise"),
+       stars = 0.05,caption.above = TRUE,ci.force = FALSE,inculde.ci=FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
